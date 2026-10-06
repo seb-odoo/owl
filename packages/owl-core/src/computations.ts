@@ -121,14 +121,28 @@ export function onWriteAtom(atom: Atom) {
       pendingDisposals.add(ctx);
     }
   }
+  let hasError = false;
+  let error: unknown;
   if (immediateObservers.length) {
     const toRun = immediateObservers;
     immediateObservers = [];
     for (const ctx of toRun) {
-      updateComputation(ctx);
+      try {
+        updateComputation(ctx);
+      } catch (e) {
+        // Mark the effect executed, as onWriteAtom only queues an executed effect
+        ctx.state = ComputationState.EXECUTED;
+        if (!hasError) {
+          hasError = true;
+          error = e;
+        }
+      }
     }
   }
   batchProcessEffects();
+  if (hasError) {
+    throw error;
+  }
 }
 
 const batchProcessEffects = batched(processEffects);
